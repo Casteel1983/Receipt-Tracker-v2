@@ -121,7 +121,7 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
-    const ACCOUNTS = ["Personal", "Joint", "YPI", "TDG"];
+    const ACCOUNTS = ["Personal", "Joint", "YPI", "TDG", "Fuel"];
     const WORK_ACCOUNTS = ["YPI", "TDG"];
 
     const DEFAULT_PERSONAL_CATS = [
@@ -142,6 +142,7 @@
       Joint:    { bg: "#E6EEF7", text: "#1D4571", border: "#B0CAE8", dot: "#2A60A0" },
       YPI:      { bg: "#F5EDE0", text: "#7A3D10", border: "#E8C99A", dot: "#A85520" },
       TDG:      { bg: "#EFE4F2", text: "#5C1A72", border: "#D4AADF", dot: "#8A2BAA" },
+      Fuel:     { bg: "#FFF0D6", text: "#7A4D00", border: "#F0CC88", dot: "#C07A00" },
     };
 
     function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -164,20 +165,54 @@
       };
     }
 
-    // localStorage-backed storage
+    // localStorage for small data, IndexedDB for files
     function loadMeta() {
       try { return JSON.parse(localStorage.getItem("rcpt-meta") || "[]"); }
       catch { return []; }
     }
     function saveMeta(list) { localStorage.setItem("rcpt-meta", JSON.stringify(list)); }
-    function loadData(id) { return localStorage.getItem("rcpt-" + id); }
-    function saveData(id, dataUrl) { localStorage.setItem("rcpt-" + id, dataUrl); }
-    function deleteData(id) { localStorage.removeItem("rcpt-" + id); }
     function loadCustomCats() {
       try { return JSON.parse(localStorage.getItem("rcpt-custom-cats") || '{"personal":[],"work":[]}'); }
       catch { return { personal: [], work: [] }; }
     }
     function saveCustomCats(cats) { localStorage.setItem("rcpt-custom-cats", JSON.stringify(cats)); }
+
+    // IndexedDB for receipt file data
+    const DB_NAME = "ReceiptTrackerDB", DB_STORE = "files", DB_VER = 1;
+    function openDB() {
+      return new Promise((res, rej) => {
+        const req = indexedDB.open(DB_NAME, DB_VER);
+        req.onupgradeneeded = e => e.target.result.createObjectStore(DB_STORE);
+        req.onsuccess = e => res(e.target.result);
+        req.onerror = e => rej(e.target.error);
+      });
+    }
+    async function saveData(id, dataUrl) {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).put(dataUrl, id);
+        tx.oncomplete = res;
+        tx.onerror = e => rej(e.target.error);
+      });
+    }
+    async function loadData(id) {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const req = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(id);
+        req.onsuccess = e => res(e.target.result || null);
+        req.onerror = e => rej(e.target.error);
+      });
+    }
+    async function deleteData(id) {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).delete(id);
+        tx.oncomplete = res;
+        tx.onerror = e => rej(e.target.error);
+      });
+    }
 
     // ── Camera modal ─────────────────────────────────────────────
     function CameraModal({ onCapture, onClose }) {
@@ -345,7 +380,7 @@
               filename: formAcc + " " + formStore + " " + formDate + "." + ext,
               type: formFile.type, ext,
             };
-            saveData(id, dataUrl);
+            await saveData(id, dataUrl);
             const updated = [...receipts, receipt].sort((a, b) => b.date.localeCompare(a.date));
             saveMeta(updated);
             setReceipts(updated);
@@ -364,27 +399,27 @@
         setNewCatInput(""); setAddingCat(false);
       };
 
-      const handleDelete = (r) => {
+      const handleDelete = async (r) => {
         if (!confirm("Delete receipt for " + r.store + "?")) return;
-        deleteData(r.id);
+        await deleteData(r.id);
         const updated = receipts.filter(x => x.id !== r.id);
         saveMeta(updated);
         setReceipts(updated);
         if (preview && preview.receipt.id === r.id) setPreview(null);
       };
 
-      const handlePreview = (r) => {
+      const handlePreview = async (r) => {
         if (preview && preview.receipt.id === r.id) { setPreview(null); return; }
         setLoadingPreview(r.id);
-        const data = loadData(r.id);
+        const data = await loadData(r.id);
         setPreview({ receipt: r, data });
         setLoadingPreview(null);
       };
 
-      const handlePrint = () => {
+      const handlePrint = async () => {
         if (!filtered.length) return;
         setPrinting(true);
-        const withData = filtered.map(r => ({ ...r, data: loadData(r.id) }));
+        const withData = await Promise.all(filtered.map(async r => ({ ...r, data: await loadData(r.id) })));
         setPrinting(false);
         const win = window.open("", "_blank");
         if (!win) { alert("Please allow popups to enable printing."); return; }
