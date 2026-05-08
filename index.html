@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Receipt Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Mono:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #F2EDE4; }
+    .rt-root { min-height: 100vh; background: #F2EDE4; font-family: 'Lora', Georgia, serif; color: #1A1410; }
+    .rt-header { background: #1A3028; padding: 0 32px; display: flex; align-items: stretch; justify-content: space-between; gap: 16px; border-bottom: 3px solid #0E1F18; }
+    .rt-header-left { padding: 20px 0; }
+    .rt-header-title { font-family: 'Playfair Display', Georgia, serif; font-size: 22px; font-weight: 700; color: #F2EDE4; letter-spacing: 0.04em; }
+    .rt-header-sub { font-family: 'DM Mono', monospace; font-size: 10px; color: #7A9E8A; margin-top: 4px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .rt-header-upload { align-self: center; background: #3A7A52; color: #F2EDE4; border: none; border-radius: 4px; padding: 10px 20px; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; cursor: pointer; transition: background 0.15s; text-transform: uppercase; }
+    .rt-header-upload:hover { background: #4A9A62; }
+    .rt-filters { background: #EAE4DA; border-bottom: 1px solid #D4CCC0; padding: 0 32px; display: flex; align-items: stretch; gap: 0; min-height: 44px; flex-wrap: wrap; }
+    .rt-filter-tab { background: none; border: none; border-bottom: 3px solid transparent; padding: 0 16px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #888; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; }
+    .rt-filter-tab:hover { color: #444; }
+    .rt-filter-tab.active { color: #1A3028; border-bottom-color: #3A7A52; font-weight: 500; }
+    .rt-divider { width: 1px; background: #D4CCC0; margin: 10px 8px; }
+    .rt-month-select { background: none; border: none; font-family: 'DM Mono', monospace; font-size: 11px; color: #666; cursor: pointer; padding: 0 12px; align-self: center; outline: none; }
+    .rt-print-btn { margin-left: auto; align-self: center; background: #1A3028; color: #F2EDE4; border: none; border-radius: 3px; padding: 7px 14px; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; cursor: pointer; transition: background 0.15s; }
+    .rt-print-btn:hover:not(:disabled) { background: #2A4A3A; }
+    .rt-print-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .rt-main { display: flex; gap: 24px; padding: 28px 32px; align-items: flex-start; }
+    .rt-list { flex: 1; min-width: 0; }
+    .rt-month-group { margin-bottom: 32px; }
+    .rt-month-label { font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: #9A9088; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+    .rt-month-label::after { content: ''; flex: 1; height: 1px; background: #D8D0C8; }
+    .rt-month-count { background: #D8D0C8; color: #7A7068; font-size: 9px; padding: 1px 6px; border-radius: 10px; }
+    .rt-row { background: #FDFAF6; border: 1px solid #E0D8CE; border-radius: 6px; padding: 12px 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all 0.12s; margin-bottom: 6px; position: relative; overflow: hidden; }
+    .rt-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; transition: background 0.15s; }
+    .rt-row:hover { border-color: #C8BEB2; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    .rt-row.active { border-color: #3A7A52; box-shadow: 0 0 0 1px #3A7A5230; }
+    .rt-row.active::before { background: #3A7A52; }
+    .rt-row-icon { width: 36px; height: 36px; background: #F0EAE0; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .rt-row-body { flex: 1; min-width: 0; }
+    .rt-row-name { font-family: 'DM Mono', monospace; font-size: 11.5px; color: #2A2018; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rt-row-meta { display: flex; align-items: center; gap: 7px; margin-top: 4px; flex-wrap: wrap; }
+    .rt-acct-pill { font-family: 'DM Mono', monospace; font-size: 9.5px; font-weight: 500; padding: 2px 8px; border-radius: 10px; }
+    .rt-cat-pill { font-family: 'DM Mono', monospace; font-size: 9px; padding: 2px 7px; border-radius: 10px; background: #EAE4DA; color: #7A7068; }
+    .rt-work-badge { font-family: 'DM Mono', monospace; font-size: 8.5px; padding: 1px 6px; border-radius: 3px; background: #2A2018; color: #D4A870; letter-spacing: 0.06em; text-transform: uppercase; }
+    .rt-row-store { font-family: 'Lora', serif; font-style: italic; font-size: 11px; color: #9A8E82; }
+    .rt-row-date { font-family: 'DM Mono', monospace; font-size: 10px; color: #B0A898; margin-left: auto; flex-shrink: 0; }
+    .rt-row-del { background: none; border: none; cursor: pointer; color: #C8C0B8; font-size: 14px; padding: 4px 6px; border-radius: 4px; line-height: 1; transition: color 0.12s, background 0.12s; flex-shrink: 0; }
+    .rt-row-del:hover { color: #c0392b; background: #FDE8E8; }
+    .rt-empty { text-align: center; padding: 80px 20px; }
+    .rt-empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+    .rt-empty-title { font-family: 'Playfair Display', serif; font-size: 18px; color: #8A8078; }
+    .rt-empty-sub { font-family: 'DM Mono', monospace; font-size: 11px; margin-top: 6px; color: #B0A898; letter-spacing: 0.04em; }
+    .rt-preview { width: 340px; flex-shrink: 0; position: sticky; top: 24px; }
+    .rt-preview-card { background: #FDFAF6; border: 1px solid #E0D8CE; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .rt-preview-head { background: #1A3028; color: #F2EDE4; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+    .rt-preview-fname { font-family: 'DM Mono', monospace; font-size: 10px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rt-preview-close { background: none; border: none; color: #F2EDE4; opacity: 0.6; cursor: pointer; font-size: 16px; padding: 0 2px; flex-shrink: 0; line-height: 1; }
+    .rt-preview-close:hover { opacity: 1; }
+    .rt-preview-body { padding: 16px; background: #F5F0E8; min-height: 280px; display: flex; align-items: center; justify-content: center; }
+    .rt-loading { text-align: center; padding: 80px; font-family: 'DM Mono', monospace; font-size: 11px; color: #B0A898; letter-spacing: 0.06em; }
+    .rt-overlay { position: fixed; inset: 0; background: rgba(15,20,15,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; backdrop-filter: blur(2px); }
+    .rt-modal { background: #FDFAF6; border-radius: 10px; width: 100%; max-width: 460px; box-shadow: 0 32px 80px rgba(0,0,0,0.35); border: 1px solid #E0D8CE; max-height: 90vh; display: flex; flex-direction: column; }
+    .rt-modal-head { background: #1A3028; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; border-radius: 10px 10px 0 0; }
+    .rt-modal-title { font-family: 'Playfair Display', serif; font-size: 17px; color: #F2EDE4; font-weight: 600; }
+    .rt-modal-x { background: none; border: none; color: #F2EDE4; opacity: 0.6; font-size: 20px; cursor: pointer; line-height: 1; padding: 0; }
+    .rt-modal-x:hover { opacity: 1; }
+    .rt-modal-body { padding: 24px; overflow-y: auto; }
+    .rt-pick-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .rt-pick-btn { flex: 1; border: 2px dashed #C8C0B8; border-radius: 8px; padding: 18px 12px; text-align: center; cursor: pointer; background: #F8F4EE; transition: all 0.2s; position: relative; overflow: hidden; }
+    .rt-pick-btn:hover { border-color: #3A7A52; background: #EFF7F2; }
+    .rt-pick-icon { font-size: 26px; margin-bottom: 5px; }
+    .rt-pick-title { font-family: 'Lora', serif; font-size: 13px; color: #6A6058; }
+    .rt-pick-sub { font-family: 'DM Mono', monospace; font-size: 10px; color: #ABA098; margin-top: 2px; letter-spacing: 0.04em; }
+    .rt-selected-file { border: 2px dashed #3A7A52; border-radius: 8px; padding: 16px; text-align: center; background: #EFF7F2; margin-bottom: 20px; position: relative; overflow: hidden; }
+    .rt-selected-icon { font-size: 24px; margin-bottom: 4px; }
+    .rt-selected-name { font-family: 'DM Mono', monospace; font-size: 11px; color: #2A5C3F; }
+    .rt-selected-sub { font-family: 'DM Mono', monospace; font-size: 10px; color: #7AAA88; margin-top: 3px; }
+    .rt-field { margin-bottom: 16px; }
+    .rt-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #9A9088; display: block; margin-bottom: 7px; }
+    .rt-input { width: 100%; padding: 9px 12px; border: 1px solid #D8D0C8; border-radius: 5px; font-family: 'Lora', serif; font-size: 13px; background: #FDFAF6; color: #1A1410; transition: border-color 0.15s; outline: none; }
+    .rt-input:focus { border-color: #3A7A52; box-shadow: 0 0 0 2px #3A7A5218; }
+    .rt-acct-row { display: flex; gap: 6px; }
+    .rt-acct-btn { flex: 1; padding: 8px 4px; border-radius: 5px; border: 1.5px solid #D8D0C8; background: white; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; color: #888; cursor: pointer; transition: all 0.12s; }
+    .rt-acct-btn:hover { border-color: #B0A898; color: #444; }
+    .rt-cat-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .rt-cat-chip { padding: 5px 11px; border-radius: 12px; border: 1.5px solid #D8D0C8; background: #FDFAF6; font-family: 'DM Mono', monospace; font-size: 10.5px; color: #7A7068; cursor: pointer; transition: all 0.12s; }
+    .rt-cat-chip:hover { border-color: #3A7A52; color: #2A5C3F; background: #EFF7F2; }
+    .rt-cat-chip.active { border-color: #3A7A52; background: #E8F0E9; color: #2A5C3F; font-weight: 500; }
+    .rt-cat-add-trigger { background: none; border: 1.5px dashed #C8C0B8; border-radius: 12px; padding: 5px 11px; font-family: 'DM Mono', monospace; font-size: 10.5px; color: #ABA098; cursor: pointer; transition: all 0.12s; }
+    .rt-cat-add-trigger:hover { border-color: #3A7A52; color: #3A7A52; }
+    .rt-cat-add-row { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+    .rt-cat-input { flex: 1; padding: 5px 10px; border: 1.5px solid #3A7A52; border-radius: 12px; font-family: 'DM Mono', monospace; font-size: 11px; background: #FDFAF6; color: #1A1410; outline: none; }
+    .rt-cat-save { background: #3A7A52; color: white; border: none; border-radius: 10px; padding: 5px 12px; font-family: 'DM Mono', monospace; font-size: 10px; cursor: pointer; }
+    .rt-cat-cancel { background: none; border: none; color: #AAA; font-size: 16px; cursor: pointer; padding: 0 4px; line-height: 1; }
+    .rt-fname-preview { background: #EAE4DA; border-left: 3px solid #3A7A52; border-radius: 0 4px 4px 0; padding: 8px 12px; margin-top: 4px; }
+    .rt-fname-lbl { font-family: 'DM Mono', monospace; font-size: 9px; color: #9A9088; text-transform: uppercase; letter-spacing: 0.08em; }
+    .rt-fname-val { font-family: 'DM Mono', monospace; font-size: 11px; color: #2A2018; margin-top: 3px; word-break: break-all; }
+    .rt-err { color: #c0392b; font-family: 'DM Mono', monospace; font-size: 11px; margin-top: 10px; }
+    .rt-modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .rt-cancel-btn { flex: 1; padding: 11px; border: 1px solid #D8D0C8; background: white; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #6A6058; cursor: pointer; transition: background 0.12s; }
+    .rt-cancel-btn:hover { background: #F5F0E8; }
+    .rt-save-btn { flex: 2; padding: 11px; background: #1A3028; color: #F2EDE4; border: none; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: background 0.15s; }
+    .rt-save-btn:hover:not(:disabled) { background: #2A4A3A; }
+    .rt-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    @media (max-width: 640px) {
+      .rt-header { padding: 0 16px; }
+      .rt-filters { padding: 0 16px; }
+      .rt-main { flex-direction: column; padding: 16px; }
+      .rt-preview { width: 100%; position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const ACCOUNTS = ["Personal", "Joint", "YPI", "TDG"];
+    const WORK_ACCOUNTS = ["YPI", "TDG"];
+
+    const DEFAULT_PERSONAL_CATS = [
+      "Groceries", "Dining", "Gas", "Utilities", "Home & Garden",
+      "Healthcare", "Shopping", "Travel", "Entertainment",
+      "Subscriptions", "Auto", "Other",
+    ];
+    const DEFAULT_WORK_CATS = [
+      "Meals & Entertainment", "Office Supplies", "Software & Subscriptions",
+      "Travel", "Accommodation", "Client Gifts", "Marketing",
+      "Equipment", "Professional Services", "Training", "Utilities", "Other",
+    ];
+
+    const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
+
+    const ACCT = {
+      Personal: { bg: "#E8F0E9", text: "#2A5C3F", border: "#B8D4BC", dot: "#3A7A52" },
+      Joint:    { bg: "#E6EEF7", text: "#1D4571", border: "#B0CAE8", dot: "#2A60A0" },
+      YPI:      { bg: "#F5EDE0", text: "#7A3D10", border: "#E8C99A", dot: "#A85520" },
+      TDG:      { bg: "#EFE4F2", text: "#5C1A72", border: "#D4AADF", dot: "#8A2BAA" },
+    };
+
+    function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+    function monthLabel(ym) {
+      if (!ym) return "";
+      const [y, m] = ym.split("-");
+      return new Date(+y, +m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+    }
+    function isWorkAccount(acc) { return WORK_ACCOUNTS.includes(acc); }
+    function parseFilename(name) {
+      const base = name.replace(/\.[^.]+$/, "");
+      const parts = base.split(" ");
+      const account = ACCOUNTS.find(a => parts[0] === a) || "";
+      const datePart = parts[parts.length - 1];
+      const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(datePart);
+      return {
+        account,
+        store: account && dateOk ? parts.slice(1, -1).join(" ") : "",
+        date: dateOk ? datePart : "",
+      };
+    }
+
+    // localStorage-backed storage
+    function loadMeta() {
+      try { return JSON.parse(localStorage.getItem("rcpt-meta") || "[]"); }
+      catch { return []; }
+    }
+    function saveMeta(list) { localStorage.setItem("rcpt-meta", JSON.stringify(list)); }
+    function loadData(id) { return localStorage.getItem("rcpt-" + id); }
+    function saveData(id, dataUrl) { localStorage.setItem("rcpt-" + id, dataUrl); }
+    function deleteData(id) { localStorage.removeItem("rcpt-" + id); }
+    function loadCustomCats() {
+      try { return JSON.parse(localStorage.getItem("rcpt-custom-cats") || '{"personal":[],"work":[]}'); }
+      catch { return { personal: [], work: [] }; }
+    }
+    function saveCustomCats(cats) { localStorage.setItem("rcpt-custom-cats", JSON.stringify(cats)); }
+
+    // ── Camera modal ─────────────────────────────────────────────
+    function CameraModal({ onCapture, onClose }) {
+      const videoRef = useRef(null);
+      const canvasRef = useRef(null);
+      const streamRef = useRef(null);
+      const [camReady, setCamReady] = useState(false);
+      const [camErr, setCamErr] = useState("");
+      const [captured, setCaptured] = useState(null);
+
+      useEffect(() => {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+          .then(stream => {
+            streamRef.current = stream;
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              videoRef.current.play();
+              setCamReady(true);
+            }
+          })
+          .catch(e => setCamErr("Camera access denied. " + (e.message || "")));
+        return () => { streamRef.current && streamRef.current.getTracks().forEach(t => t.stop()); };
+      }, []);
+
+      const snap = () => {
+        const v = videoRef.current, c = canvasRef.current;
+        if (!v || !c) return;
+        c.width = v.videoWidth; c.height = v.videoHeight;
+        c.getContext("2d").drawImage(v, 0, 0);
+        setCaptured(c.toDataURL("image/jpeg", 0.92));
+      };
+
+      const confirmPhoto = () => {
+        if (!captured) return;
+        const arr = captured.split(","), mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]); let n = bstr.length;
+        const u8 = new Uint8Array(n);
+        while (n--) u8[n] = bstr.charCodeAt(n);
+        const file = new File([u8], "camera-" + Date.now() + ".jpg", { type: mime });
+        streamRef.current && streamRef.current.getTracks().forEach(t => t.stop());
+        onCapture(file);
+      };
+
+      return (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ width: "100%", maxWidth: 480, background: "#111", borderRadius: 10, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
+            <div style={{ background: "#1A3028", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontFamily: "'Playfair Display', serif", color: "#F2EDE4", fontSize: 15 }}>Take Photo</span>
+              <button onClick={onClose} style={{ background: "none", border: "none", color: "#F2EDE4", fontSize: 20, cursor: "pointer", opacity: 0.7, lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ position: "relative", background: "#000", minHeight: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {camErr ? (
+                <div style={{ color: "#EEA", fontFamily: "'DM Mono', monospace", fontSize: 12, padding: 32, textAlign: "center" }}>{camErr}</div>
+              ) : (
+                <React.Fragment>
+                  <video ref={videoRef} style={{ width: "100%", display: captured ? "none" : "block", maxHeight: 360, objectFit: "cover" }} playsInline muted />
+                  {captured && <img src={captured} style={{ width: "100%", maxHeight: 360, objectFit: "contain" }} alt="captured" />}
+                  <canvas ref={canvasRef} style={{ display: "none" }} />
+                  {!camReady && !captured && (
+                    <div style={{ position: "absolute", color: "#666", fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: "0.06em" }}>Starting camera…</div>
+                  )}
+                </React.Fragment>
+              )}
+            </div>
+            <div style={{ padding: "14px 16px", display: "flex", gap: 10, background: "#1A1A1A" }}>
+              {!captured ? (
+                <React.Fragment>
+                  <button onClick={onClose} style={{ flex: 1, padding: 10, background: "transparent", border: "1px solid #444", borderRadius: 5, color: "#AAA", fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer" }}>Cancel</button>
+                  <button onClick={snap} disabled={!camReady || !!camErr} style={{ flex: 2, padding: 10, background: camReady && !camErr ? "#3A7A52" : "#333", border: "none", borderRadius: 5, color: "#F2EDE4", fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", cursor: camReady && !camErr ? "pointer" : "not-allowed" }}>📷 Snap</button>
+                </React.Fragment>
+              ) : (
+                <React.Fragment>
+                  <button onClick={() => setCaptured(null)} style={{ flex: 1, padding: 10, background: "transparent", border: "1px solid #444", borderRadius: 5, color: "#AAA", fontFamily: "'DM Mono', monospace", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer" }}>Retake</button>
+                  <button onClick={confirmPhoto} style={{ flex: 2, padding: 10, background: "#3A7A52", border: "none", borderRadius: 5, color: "#F2EDE4", fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", cursor: "pointer" }}>✓ Use Photo</button>
+                </React.Fragment>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Main App ─────────────────────────────────────────────────
+    function ReceiptTracker() {
+      const [receipts, setReceipts] = useState([]);
+      const [ready, setReady] = useState(false);
+      const [filterAcc, setFilterAcc] = useState("All");
+      const [filterMonth, setFilterMonth] = useState("All");
+      const [showModal, setShowModal] = useState(false);
+      const [showCamera, setShowCamera] = useState(false);
+      const [printing, setPrinting] = useState(false);
+      const [preview, setPreview] = useState(null);
+      const [loadingPreview, setLoadingPreview] = useState(null);
+      const [customCats, setCustomCats] = useState({ personal: [], work: [] });
+
+      const [formFile, setFormFile] = useState(null);
+      const [formAcc, setFormAcc] = useState("");
+      const [formStore, setFormStore] = useState("");
+      const [formDate, setFormDate] = useState("");
+      const [formCategory, setFormCategory] = useState("");
+      const [formErr, setFormErr] = useState("");
+      const [saving, setSaving] = useState(false);
+      const [newCatInput, setNewCatInput] = useState("");
+      const [addingCat, setAddingCat] = useState(false);
+
+      useEffect(() => {
+        setReceipts(loadMeta());
+        setCustomCats(loadCustomCats());
+        setReady(true);
+      }, []);
+
+      const catType = formAcc && isWorkAccount(formAcc) ? "work" : "personal";
+      const baseCats = catType === "work" ? DEFAULT_WORK_CATS : DEFAULT_PERSONAL_CATS;
+      const allCats = [...baseCats, ...(customCats[catType] || [])];
+
+      const handleAddCategory = () => {
+        const name = newCatInput.trim();
+        if (!name || allCats.includes(name)) { setNewCatInput(""); setAddingCat(false); return; }
+        const updated = { ...customCats, [catType]: [...(customCats[catType] || []), name] };
+        setCustomCats(updated);
+        saveCustomCats(updated);
+        setFormCategory(name);
+        setNewCatInput("");
+        setAddingCat(false);
+      };
+
+      const months = [...new Set(receipts.map(r => r.month))].sort().reverse();
+      const filtered = receipts.filter(r =>
+        (filterAcc === "All" || r.account === filterAcc) &&
+        (filterMonth === "All" || r.month === filterMonth)
+      );
+      const grouped = filtered.reduce((acc, r) => {
+        (acc[r.month] = acc[r.month] || []).push(r); return acc;
+      }, {});
+      const sortedMonths = Object.keys(grouped).sort().reverse();
+
+      const handleFilePick = (file) => {
+        if (!file) return;
+        if (file.size > MAX_FILE_SIZE) {
+          setFormErr("File too large (" + (file.size / 1048576).toFixed(1) + " MB). Max 4.5 MB."); return;
+        }
+        setFormErr("");
+        setFormFile(file);
+        const p = parseFilename(file.name);
+        if (p.account) setFormAcc(p.account);
+        if (p.store) setFormStore(p.store);
+        if (p.date) setFormDate(p.date);
+      };
+
+      const handleSave = () => {
+        if (!formFile || !formAcc || !formStore || !formDate) {
+          setFormErr("Please complete all fields."); return;
+        }
+        setSaving(true);
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const dataUrl = reader.result;
+            const id = genId();
+            const ext = formFile.name.split(".").pop().toLowerCase();
+            const receipt = {
+              id, account: formAcc, store: formStore, date: formDate,
+              month: formDate.slice(0, 7),
+              category: formCategory || "",
+              filename: formAcc + " " + formStore + " " + formDate + "." + ext,
+              type: formFile.type, ext,
+            };
+            saveData(id, dataUrl);
+            const updated = [...receipts, receipt].sort((a, b) => b.date.localeCompare(a.date));
+            saveMeta(updated);
+            setReceipts(updated);
+            setShowModal(false);
+            resetForm();
+          } catch(e) { setFormErr("Save failed: " + e.message); }
+          setSaving(false);
+        };
+        reader.onerror = () => { setFormErr("Could not read file."); setSaving(false); };
+        reader.readAsDataURL(formFile);
+      };
+
+      const resetForm = () => {
+        setFormFile(null); setFormAcc(""); setFormStore("");
+        setFormDate(""); setFormCategory(""); setFormErr("");
+        setNewCatInput(""); setAddingCat(false);
+      };
+
+      const handleDelete = (r) => {
+        if (!confirm("Delete receipt for " + r.store + "?")) return;
+        deleteData(r.id);
+        const updated = receipts.filter(x => x.id !== r.id);
+        saveMeta(updated);
+        setReceipts(updated);
+        if (preview && preview.receipt.id === r.id) setPreview(null);
+      };
+
+      const handlePreview = (r) => {
+        if (preview && preview.receipt.id === r.id) { setPreview(null); return; }
+        setLoadingPreview(r.id);
+        const data = loadData(r.id);
+        setPreview({ receipt: r, data });
+        setLoadingPreview(null);
+      };
+
+      const handlePrint = () => {
+        if (!filtered.length) return;
+        setPrinting(true);
+        const withData = filtered.map(r => ({ ...r, data: loadData(r.id) }));
+        setPrinting(false);
+        const win = window.open("", "_blank");
+        if (!win) { alert("Please allow popups to enable printing."); return; }
+        const label = [filterAcc !== "All" ? filterAcc : "", filterMonth !== "All" ? monthLabel(filterMonth) : ""].filter(Boolean).join(" — ") || "All Receipts";
+        const pages = withData.map(r => {
+          const isImg = r.type && r.type.startsWith("image/");
+          const content = isImg
+            ? '<img src="' + r.data + '" style="max-width:100%;max-height:calc(100vh - 80px);object-fit:contain;">'
+            : '<embed src="' + r.data + '" type="application/pdf" width="100%" style="height:calc(100vh - 80px);">';
+          return '<div class="page"><p class="lbl">' + r.filename + '</p>' + content + '</div>';
+        }).join("");
+        win.document.write('<!DOCTYPE html><html><head><title>' + label + '</title><style>*{margin:0;box-sizing:border-box}body{font-family:Georgia,serif;background:#fff}h1{text-align:center;padding:18px;font-size:15px;border-bottom:1px solid #ddd;color:#222}.page{page-break-after:always;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}.lbl{font-family:monospace;font-size:11px;color:#888;margin-bottom:10px;align-self:flex-start}</style></head><body><h1>' + label + ' · ' + withData.length + ' receipt' + (withData.length !== 1 ? 's' : '') + '</h1>' + pages + '<script>window.onload=()=>setTimeout(()=>window.print(),700);<\/script></body></html>');
+        win.document.close();
+      };
+
+      const genFilename = () =>
+        formAcc && formStore && formDate
+          ? formAcc + " " + formStore + " " + formDate + "." + (formFile ? formFile.name.split(".").pop() : "jpg")
+          : "";
+
+      const closeModal = () => { setShowModal(false); resetForm(); };
+      const uniqueAccounts = [...new Set(receipts.map(r => r.account))];
+
+      return (
+        <React.Fragment>
+          <div className="rt-root">
+            {/* Header */}
+            <header className="rt-header">
+              <div className="rt-header-left">
+                <div className="rt-header-title">Receipt Tracker</div>
+                <div className="rt-header-sub">
+                  {receipts.length} receipt{receipts.length !== 1 ? "s" : ""} · {uniqueAccounts.length} account{uniqueAccounts.length !== 1 ? "s" : ""}
+                </div>
+              </div>
+              <button className="rt-header-upload" onClick={() => setShowModal(true)}>+ Upload</button>
+            </header>
+
+            {/* Filters */}
+            <div className="rt-filters">
+              {["All", ...ACCOUNTS].map(a => (
+                <button key={a} className={"rt-filter-tab" + (filterAcc === a ? " active" : "")} onClick={() => setFilterAcc(a)}>{a}</button>
+              ))}
+              <div className="rt-divider" />
+              <select className="rt-month-select" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
+                <option value="All">All months</option>
+                {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+              </select>
+              {filtered.length > 0 && (
+                <button className="rt-print-btn" onClick={handlePrint} disabled={printing}>
+                  {printing ? "Preparing…" : "Print " + filtered.length}
+                </button>
+              )}
+            </div>
+
+            {/* Main */}
+            <div className="rt-main">
+              <div className="rt-list">
+                {!ready ? (
+                  <div className="rt-loading">Loading records…</div>
+                ) : filtered.length === 0 ? (
+                  <div className="rt-empty">
+                    <div className="rt-empty-icon">📂</div>
+                    <div className="rt-empty-title">No receipts found</div>
+                    <div className="rt-empty-sub">Upload a receipt to get started</div>
+                  </div>
+                ) : sortedMonths.map(month => (
+                  <div key={month} className="rt-month-group">
+                    <div className="rt-month-label">
+                      {monthLabel(month)}
+                      <span className="rt-month-count">{grouped[month].length}</span>
+                    </div>
+                    {grouped[month].map(r => {
+                      const isActive = preview && preview.receipt.id === r.id;
+                      const isLoading = loadingPreview === r.id;
+                      const c = ACCT[r.account] || { bg: "#EEE", text: "#333", border: "#CCC" };
+                      const isWork = isWorkAccount(r.account);
+                      return (
+                        <div key={r.id} className={"rt-row" + (isActive ? " active" : "")} onClick={() => handlePreview(r)}>
+                          <div className="rt-row-icon">{isLoading ? "⏳" : r.type && r.type.startsWith("image/") ? "🖼" : "📄"}</div>
+                          <div className="rt-row-body">
+                            <div className="rt-row-name">{r.filename}</div>
+                            <div className="rt-row-meta">
+                              <span className="rt-acct-pill" style={{ background: c.bg, color: c.text, border: "1px solid " + c.border }}>{r.account}</span>
+                              {isWork && <span className="rt-work-badge">Work</span>}
+                              <span className="rt-row-store">{r.store}</span>
+                              {r.category && <span className="rt-cat-pill">{r.category}</span>}
+                            </div>
+                          </div>
+                          <span className="rt-row-date">{r.date}</span>
+                          <button className="rt-row-del" onClick={e => { e.stopPropagation(); handleDelete(r); }} title="Delete">✕</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+
+              {/* Preview */}
+              {preview && (
+                <div className="rt-preview">
+                  <div className="rt-preview-card">
+                    <div className="rt-preview-head">
+                      <div className="rt-preview-fname">{preview.receipt.filename}</div>
+                      <button className="rt-preview-close" onClick={() => setPreview(null)}>✕</button>
+                    </div>
+                    <div className="rt-preview-body">
+                      {preview.data
+                        ? preview.receipt.type && preview.receipt.type.startsWith("image/")
+                          ? <img src={preview.data} style={{ maxWidth: "100%", maxHeight: 420, objectFit: "contain", borderRadius: 4 }} alt={preview.receipt.filename} />
+                          : <embed src={preview.data} type="application/pdf" width="100%" style={{ height: 420, borderRadius: 4 }} />
+                        : <div style={{ color: "#9A8E82", fontFamily: "'DM Mono', monospace", fontSize: 11 }}>Unable to load preview.</div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Camera */}
+          {showCamera && (
+            <CameraModal
+              onCapture={file => { handleFilePick(file); setShowCamera(false); setShowModal(true); }}
+              onClose={() => { setShowCamera(false); setShowModal(true); }}
+            />
+          )}
+
+          {/* Upload modal */}
+          {showModal && (
+            <div className="rt-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
+              <div className="rt-modal">
+                <div className="rt-modal-head">
+                  <div className="rt-modal-title">Upload Receipt</div>
+                  <button className="rt-modal-x" onClick={closeModal}>✕</button>
+                </div>
+                <div className="rt-modal-body">
+
+                  {/* File / Camera picker */}
+                  {formFile ? (
+                    <div className="rt-selected-file">
+                      <div className="rt-selected-icon">{formFile.type && formFile.type.startsWith("image/") ? "🖼" : "📄"}</div>
+                      <div className="rt-selected-name">{formFile.name}</div>
+                      <div className="rt-selected-sub">
+                        {(formFile.size / 1024).toFixed(0)} KB ·{" "}
+                        <label style={{ color: "#3A7A52", cursor: "pointer", textDecoration: "underline", position: "relative" }}>
+                          change file
+                          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={e => handleFilePick(e.target.files[0])} style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", cursor: "pointer" }} />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rt-pick-row">
+                      <label className="rt-pick-btn">
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={e => handleFilePick(e.target.files[0])} style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", height: "100%", cursor: "pointer" }} />
+                        <div className="rt-pick-icon">📎</div>
+                        <div className="rt-pick-title">Browse file</div>
+                        <div className="rt-pick-sub">PDF · JPG · PNG</div>
+                      </label>
+                      <div className="rt-pick-btn" onClick={() => { setShowModal(false); setShowCamera(true); }}>
+                        <div className="rt-pick-icon">📷</div>
+                        <div className="rt-pick-title">Take photo</div>
+                        <div className="rt-pick-sub">Use camera</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Account */}
+                  <div className="rt-field">
+                    <label className="rt-label">Account</label>
+                    <div className="rt-acct-row">
+                      {ACCOUNTS.map(a => {
+                        const c = ACCT[a]; const active = formAcc === a;
+                        return (
+                          <button key={a} className="rt-acct-btn"
+                            onClick={() => { setFormAcc(a); setFormCategory(""); }}
+                            style={active ? { background: c.bg, color: c.text, border: "1.5px solid " + c.dot } : {}}>
+                            {a}
+                            {isWorkAccount(a) && <span style={{ fontSize: 8, opacity: 0.6, display: "block", marginTop: 1 }}>work</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Store */}
+                  <div className="rt-field">
+                    <label className="rt-label">Store / Merchant</label>
+                    <input className="rt-input" value={formStore} onChange={e => setFormStore(e.target.value)} placeholder="e.g. Kroger, Amazon, HomeDepot" />
+                  </div>
+
+                  {/* Category */}
+                  <div className="rt-field">
+                    <label className="rt-label">
+                      Category{" "}
+                      <span style={{ opacity: 0.5, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+                      {formAcc && <span style={{ marginLeft: 8, color: isWorkAccount(formAcc) ? "#A85520" : "#3A7A52", fontSize: 9 }}>
+                        {isWorkAccount(formAcc) ? "● Work" : "● Personal"}
+                      </span>}
+                    </label>
+                    <div className="rt-cat-grid">
+                      {allCats.map(cat => (
+                        <button key={cat} className={"rt-cat-chip" + (formCategory === cat ? " active" : "")}
+                          onClick={() => setFormCategory(formCategory === cat ? "" : cat)}>
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                    {!addingCat ? (
+                      <button className="rt-cat-add-trigger" onClick={() => setAddingCat(true)}>+ Add category</button>
+                    ) : (
+                      <div className="rt-cat-add-row">
+                        <input
+                          className="rt-cat-input"
+                          value={newCatInput}
+                          onChange={e => setNewCatInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") handleAddCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCatInput(""); }}}
+                          placeholder="New category name…"
+                          autoFocus
+                        />
+                        <button className="rt-cat-save" onClick={handleAddCategory}>Add</button>
+                        <button className="rt-cat-cancel" onClick={() => { setAddingCat(false); setNewCatInput(""); }}>✕</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Date */}
+                  <div className="rt-field">
+                    <label className="rt-label">Date</label>
+                    <input className="rt-input" type="date" value={formDate} onChange={e => setFormDate(e.target.value)} />
+                  </div>
+
+                  {/* Filename preview */}
+                  {genFilename() && (
+                    <div className="rt-fname-preview">
+                      <div className="rt-fname-lbl">Generated filename</div>
+                      <div className="rt-fname-val">{genFilename()}</div>
+                    </div>
+                  )}
+
+                  {formErr && <div className="rt-err">{formErr}</div>}
+
+                  <div className="rt-modal-actions">
+                    <button className="rt-cancel-btn" onClick={closeModal}>Cancel</button>
+                    <button className="rt-save-btn" onClick={handleSave} disabled={saving}>
+                      {saving ? "Saving…" : "Save Receipt"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </React.Fragment>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<ReceiptTracker />);
+  </script>
+</body>
+</html>
