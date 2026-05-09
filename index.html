@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -126,7 +127,7 @@
     var useRef = React.useRef;
 
     // ── Config ────────────────────────────────────────────────────
-    var VERCEL_URL = "https://receipt-8rvzi5srs-casteel1983s-projects.vercel.app/api/claude";
+    var VERCEL_URL = "https://YOUR-VERCEL-URL.vercel.app/api/claude";
 
     var ACCOUNTS = ["Personal", "Joint", "YPI", "TDG", "Fuel"];
     var WORK_ACCOUNTS = ["YPI", "TDG"];
@@ -336,7 +337,7 @@
           <div style={{width:"100%",maxWidth:480,background:"#111",borderRadius:10,overflow:"hidden",boxShadow:"0 32px 80px rgba(0,0,0,0.6)"}}>
             <div style={{background:"#1A3028",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span style={{fontFamily:"'Playfair Display',serif",color:"#F2EDE4",fontSize:15}}>Take Photo</span>
-              <button onClick={onClose} style={{background:"none",border:"none",color:"#F2EDE4",fontSize:20,cursor:"pointer",opacity:0.7,lineHeight:1}}>&#x2715;</button>
+              <button onClick={onClose} style={{background:"none",border:"none",color:"#F2EDE4",fontSize:20,cursor:"pointer",opacity:0.7,lineHeight:1}}>✕</button>
             </div>
             <div style={{position:"relative",background:"#000",minHeight:280,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {camErr ? (
@@ -347,7 +348,7 @@
                   {captured && <img src={captured} style={{width:"100%",maxHeight:360,objectFit:"contain"}} alt="captured" />}
                   <canvas ref={canvasRef} style={{display:"none"}} />
                   {!camReady && !captured && (
-                    <div style={{position:"absolute",color:"#666",fontFamily:"'DM Mono',monospace",fontSize:11}}>Starting camera&#8230;</div>
+                    <div style={{position:"absolute",color:"#666",fontFamily:"'DM Mono',monospace",fontSize:11}}>Starting camera…</div>
                   )}
                 </React.Fragment>
               )}
@@ -356,12 +357,12 @@
               {!captured ? (
                 <React.Fragment>
                   <button onClick={onClose} style={{flex:1,padding:10,background:"transparent",border:"1px solid #444",borderRadius:5,color:"#AAA",fontFamily:"'DM Mono',monospace",fontSize:11,textTransform:"uppercase",cursor:"pointer"}}>Cancel</button>
-                  <button onClick={snap} disabled={!camReady||!!camErr} style={{flex:2,padding:10,background:camReady&&!camErr?"#3A7A52":"#333",border:"none",borderRadius:5,color:"#F2EDE4",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:500,textTransform:"uppercase",cursor:camReady&&!camErr?"pointer":"not-allowed"}}>&#128247; Snap</button>
+                  <button onClick={snap} disabled={!camReady||!!camErr} style={{flex:2,padding:10,background:camReady&&!camErr?"#3A7A52":"#333",border:"none",borderRadius:5,color:"#F2EDE4",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:500,textTransform:"uppercase",cursor:camReady&&!camErr?"pointer":"not-allowed"}}>📷 Snap</button>
                 </React.Fragment>
               ) : (
                 <React.Fragment>
                   <button onClick={function(){setCaptured(null);}} style={{flex:1,padding:10,background:"transparent",border:"1px solid #444",borderRadius:5,color:"#AAA",fontFamily:"'DM Mono',monospace",fontSize:11,textTransform:"uppercase",cursor:"pointer"}}>Retake</button>
-                  <button onClick={confirmPhoto} style={{flex:2,padding:10,background:"#3A7A52",border:"none",borderRadius:5,color:"#F2EDE4",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:500,textTransform:"uppercase",cursor:"pointer"}}>&#10003; Use Photo</button>
+                  <button onClick={confirmPhoto} style={{flex:2,padding:10,background:"#3A7A52",border:"none",borderRadius:5,color:"#F2EDE4",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:500,textTransform:"uppercase",cursor:"pointer"}}>✓ Use Photo</button>
                 </React.Fragment>
               )}
             </div>
@@ -567,7 +568,7 @@
               <div className="rt-header-left">
                 <div className="rt-header-title">Receipt Tracker</div>
                 <div className="rt-header-sub">
-                  {receipts.length} receipt{receipts.length !== 1 ? "s" : ""} &middot; {uniqueAccounts.length} account{uniqueAccounts.length !== 1 ? "s" : ""}
+                  {receipts.length} receipt{receipts.length !== 1 ? "s" : ""} · {uniqueAccounts.length} account{uniqueAccounts.length !== 1 ? "s" : ""}
                 </div>
               </div>
               <button className="rt-header-upload" onClick={function(){setShowModal(true);}}>+ Upload</button>
@@ -592,10 +593,10 @@
             <div className="rt-main">
               <div className="rt-list">
                 {!ready ? (
-                  <div className="rt-loading">Loading records&#8230;</div>
+                  <div className="rt-loading">Loading records…</div>
                 ) : filtered.length === 0 ? (
                   <div className="rt-empty">
-                    <div className="rt-empty-icon">&#128194;</div>
+                    <div className="rt-empty-icon">📂</div>
                     <div className="rt-empty-title">No receipts found</div>
                     <div className="rt-empty-sub">Upload a receipt to get started</div>
                   </div>
@@ -613,7 +614,7 @@
                         var isWork = isWorkAccount(r.account);
                         return (
                           <div key={r.id} className={"rt-row" + (isActive ? " active" : "")} onClick={function(){handlePreview(r);}}>
-                            <div className="rt-row-icon">{isLoading ? "&#9203;" : r.type && r.type.indexOf("image/") === 0 ? "&#128444;" : "&#128196;"}</div>
+                            <div className="rt-row-icon">{isLoading ? "⏳" : r.type && r.type.indexOf("image/") === 0 ? "🖼" : "📄"}</div>
                             <div className="rt-row-body">
                               <div className="rt-row-name">{r.filename}</div>
                               <div className="rt-row-meta">
@@ -624,7 +625,7 @@
                               </div>
                             </div>
                             <span className="rt-row-date">{r.date}</span>
-                            <button className="rt-row-del" onClick={function(e){e.stopPropagation();handleDelete(r);}} title="Delete">&#x2715;</button>
+                            <button className="rt-row-del" onClick={function(e){e.stopPropagation();handleDelete(r);}} title="Delete">✕</button>
                           </div>
                         );
                       })}
@@ -638,7 +639,7 @@
                   <div className="rt-preview-card">
                     <div className="rt-preview-head">
                       <div className="rt-preview-fname">{preview.receipt.filename}</div>
-                      <button className="rt-preview-close" onClick={function(){setPreview(null);}}>&#x2715;</button>
+                      <button className="rt-preview-close" onClick={function(){setPreview(null);}}>✕</button>
                     </div>
                     <div className="rt-preview-body">
                       {preview.data
@@ -666,19 +667,19 @@
               <div className="rt-modal">
                 <div className="rt-modal-head">
                   <div className="rt-modal-title">Upload Receipt</div>
-                  <button className="rt-modal-x" onClick={closeModal}>&#x2715;</button>
+                  <button className="rt-modal-x" onClick={closeModal}>✕</button>
                 </div>
                 <div className="rt-modal-body">
 
                   {formFile ? (
                     <div className="rt-selected-file">
-                      <div className="rt-selected-icon">{formFile.type && formFile.type.indexOf("image/") === 0 ? "&#128444;" : "&#128196;"}</div>
+                      <div className="rt-selected-icon">{formFile.type && formFile.type.indexOf("image/") === 0 ? "🖼" : "📄"}</div>
                       <div className="rt-selected-name">{formFile.name}</div>
                       {scanning ? (
-                        <div className="rt-selected-sub" style={{color:"#3A7A52"}}>&#10024; Scanning receipt&#8230;</div>
+                        <div className="rt-selected-sub" style={{color:"#3A7A52"}}>✨ Scanning receipt…</div>
                       ) : (
                         <div className="rt-selected-sub">
-                          {(formFile.size / 1024).toFixed(0)} KB &middot;{" "}
+                          {(formFile.size / 1024).toFixed(0)} KB ·{" "}
                           <label style={{color:"#3A7A52",cursor:"pointer",textDecoration:"underline",position:"relative"}}>
                             change file
                             <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
@@ -694,12 +695,12 @@
                         <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
                           onChange={function(e){handleFilePick(e.target.files[0]);}}
                           style={{position:"absolute",inset:0,opacity:0,width:"100%",height:"100%",cursor:"pointer"}} />
-                        <div className="rt-pick-icon">&#128206;</div>
+                        <div className="rt-pick-icon">📎</div>
                         <div className="rt-pick-title">Browse file</div>
-                        <div className="rt-pick-sub">PDF &middot; JPG &middot; PNG</div>
+                        <div className="rt-pick-sub">PDF · JPG · PNG</div>
                       </label>
                       <div className="rt-pick-btn" onClick={function(){setShowModal(false);setShowCamera(true);}}>
-                        <div className="rt-pick-icon">&#128247;</div>
+                        <div className="rt-pick-icon">📷</div>
                         <div className="rt-pick-title">Take photo</div>
                         <div className="rt-pick-sub">Use camera</div>
                       </div>
@@ -733,7 +734,7 @@
                       <button className="rt-suggest-btn"
                         disabled={suggesting || !formStore.trim()}
                         onClick={handleSuggestCategory}>
-                        {suggesting ? "&#8230;" : "&#10024; Suggest"}
+                        {suggesting ? "…" : "✨ Suggest"}
                       </button>
                     </div>
                   </div>
@@ -768,10 +769,10 @@
                             if (e.key === "Enter") handleAddCategory();
                             if (e.key === "Escape") { setAddingCat(false); setNewCatInput(""); }
                           }}
-                          placeholder="New category name&#8230;"
+                          placeholder="New category name…"
                           autoFocus />
                         <button className="rt-cat-save" onClick={handleAddCategory}>Add</button>
-                        <button className="rt-cat-cancel" onClick={function(){setAddingCat(false);setNewCatInput("");}}>&#x2715;</button>
+                        <button className="rt-cat-cancel" onClick={function(){setAddingCat(false);setNewCatInput("");}}>✕</button>
                       </div>
                     )}
                   </div>
