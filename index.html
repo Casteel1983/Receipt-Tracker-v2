@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -107,6 +108,9 @@
     .rt-save-btn { flex: 2; padding: 11px; background: #1A3028; color: #F2EDE4; border: none; border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: background 0.15s; }
     .rt-save-btn:hover:not(:disabled) { background: #2A4A3A; }
     .rt-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .rt-suggest-btn { flex-shrink: 0; background: none; border: 1.5px solid #D8D0C8; border-radius: 5px; padding: 9px 11px; font-family: 'DM Mono', monospace; font-size: 11px; color: #3A7A52; cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+    .rt-suggest-btn:hover:not(:disabled) { border-color: #3A7A52; background: #EFF7F2; }
+    .rt-suggest-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     @media (max-width: 640px) {
       .rt-header { padding: 0 16px; }
       .rt-filters { padding: 0 16px; }
@@ -118,25 +122,30 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    var useState = React.useState;
+    var useEffect = React.useEffect;
+    var useRef = React.useRef;
 
-    const ACCOUNTS = ["Personal", "Joint", "YPI", "TDG", "Fuel"];
-    const WORK_ACCOUNTS = ["YPI", "TDG"];
+    // ── Config ────────────────────────────────────────────────────
+    var VERCEL_URL = "https://YOUR-VERCEL-URL.vercel.app/api/claude";
 
-    const DEFAULT_PERSONAL_CATS = [
+    var ACCOUNTS = ["Personal", "Joint", "YPI", "TDG", "Fuel"];
+    var WORK_ACCOUNTS = ["YPI", "TDG"];
+
+    var DEFAULT_PERSONAL_CATS = [
       "Groceries", "Dining", "Gas", "Utilities", "Home & Garden",
       "Healthcare", "Shopping", "Travel", "Entertainment",
       "Subscriptions", "Auto", "Other"
     ];
-    const DEFAULT_WORK_CATS = [
+    var DEFAULT_WORK_CATS = [
       "Meals & Entertainment", "Office Supplies", "Software & Subscriptions",
       "Travel", "Accommodation", "Client Gifts", "Marketing",
       "Equipment", "Professional Services", "Training", "Utilities", "Other"
     ];
 
-    const MAX_FILE_SIZE = 4.5 * 1024 * 1024;
+    var MAX_FILE_SIZE = 4.5 * 1024 * 1024;
 
-    const ACCT = {
+    var ACCT = {
       Personal: { bg: "#E8F0E9", text: "#2A5C3F", border: "#B8D4BC", dot: "#3A7A52" },
       Joint:    { bg: "#E6EEF7", text: "#1D4571", border: "#B0CAE8", dot: "#2A60A0" },
       YPI:      { bg: "#F5EDE0", text: "#7A3D10", border: "#E8C99A", dot: "#A85520" },
@@ -144,61 +153,58 @@
       Fuel:     { bg: "#FFF0D6", text: "#7A4D00", border: "#F0CC88", dot: "#C07A00" }
     };
 
+    // ── Helpers ───────────────────────────────────────────────────
     function genId() {
       return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     }
     function monthLabel(ym) {
       if (!ym) return "";
-      const [y, m] = ym.split("-");
-      return new Date(+y, +m - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
+      var parts = ym.split("-");
+      return new Date(+parts[0], +parts[1] - 1, 1).toLocaleString("default", { month: "long", year: "numeric" });
     }
-    function isWorkAccount(acc) { return WORK_ACCOUNTS.includes(acc); }
+    function isWorkAccount(acc) { return WORK_ACCOUNTS.indexOf(acc) !== -1; }
     function parseFilename(name) {
-      const base = name.replace(/\.[^.]+$/, "");
-      const parts = base.split(" ");
-      const account = ACCOUNTS.find(a => parts[0] === a) || "";
-      const datePart = parts[parts.length - 1];
-      const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(datePart);
+      var base = name.replace(/\.[^.]+$/, "");
+      var parts = base.split(" ");
+      var account = "";
+      for (var i = 0; i < ACCOUNTS.length; i++) {
+        if (parts[0] === ACCOUNTS[i]) { account = ACCOUNTS[i]; break; }
+      }
+      var datePart = parts[parts.length - 1];
+      var dateOk = /^\d{4}-\d{2}-\d{2}$/.test(datePart);
       return {
-        account,
+        account: account,
         store: account && dateOk ? parts.slice(1, -1).join(" ") : "",
         date: dateOk ? datePart : ""
       };
     }
 
-    // ── Storage ───────────────────────────────────────────────────
+    // ── LocalStorage ──────────────────────────────────────────────
     function loadMeta() {
       try { return JSON.parse(localStorage.getItem("rcpt-meta") || "[]"); }
       catch (e) { return []; }
     }
-    function saveMeta(list) {
-      localStorage.setItem("rcpt-meta", JSON.stringify(list));
-    }
+    function saveMeta(list) { localStorage.setItem("rcpt-meta", JSON.stringify(list)); }
     function loadCustomCats() {
       try { return JSON.parse(localStorage.getItem("rcpt-custom-cats") || '{"personal":[],"work":[]}'); }
       catch (e) { return { personal: [], work: [] }; }
     }
-    function saveCustomCats(cats) {
-      localStorage.setItem("rcpt-custom-cats", JSON.stringify(cats));
-    }
+    function saveCustomCats(cats) { localStorage.setItem("rcpt-custom-cats", JSON.stringify(cats)); }
 
-    // IndexedDB for file data (no size limits)
-    const DB_NAME = "ReceiptTrackerDB";
-    const DB_STORE = "files";
-    const DB_VER = 1;
-
+    // ── IndexedDB ─────────────────────────────────────────────────
+    var DB_NAME = "ReceiptTrackerDB";
+    var DB_STORE = "files";
+    var DB_VER = 1;
     function openDB() {
       return new Promise(function(res, rej) {
         var req = indexedDB.open(DB_NAME, DB_VER);
-        req.onupgradeneeded = function(e) {
-          e.target.result.createObjectStore(DB_STORE);
-        };
+        req.onupgradeneeded = function(e) { e.target.result.createObjectStore(DB_STORE); };
         req.onsuccess = function(e) { res(e.target.result); };
         req.onerror = function(e) { rej(e.target.error); };
       });
     }
     async function saveData(id, dataUrl) {
-      const db = await openDB();
+      var db = await openDB();
       return new Promise(function(res, rej) {
         var tx = db.transaction(DB_STORE, "readwrite");
         tx.objectStore(DB_STORE).put(dataUrl, id);
@@ -207,7 +213,7 @@
       });
     }
     async function loadData(id) {
-      const db = await openDB();
+      var db = await openDB();
       return new Promise(function(res, rej) {
         var req = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(id);
         req.onsuccess = function(e) { res(e.target.result || null); };
@@ -215,7 +221,7 @@
       });
     }
     async function deleteData(id) {
-      const db = await openDB();
+      var db = await openDB();
       return new Promise(function(res, rej) {
         var tx = db.transaction(DB_STORE, "readwrite");
         tx.objectStore(DB_STORE).delete(id);
@@ -224,14 +230,71 @@
       });
     }
 
+    // ── Claude API ────────────────────────────────────────────────
+    async function askClaude(textPrompt, imageBase64, imageMime) {
+      var userContent;
+      if (imageBase64) {
+        userContent = [
+          { type: "image", source: { type: "base64", media_type: imageMime, data: imageBase64 } },
+          { type: "text", text: textPrompt }
+        ];
+      } else {
+        userContent = textPrompt;
+      }
+      try {
+        var resp = await fetch(VERCEL_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: 256,
+            messages: [{ role: "user", content: userContent }]
+          })
+        });
+        var data = await resp.json();
+        if (data.content && data.content[0]) return data.content[0].text.trim();
+        return "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    async function scanReceipt(file, catList) {
+      var base64 = await new Promise(function(res, rej) {
+        var reader = new FileReader();
+        reader.onload = function() { res(reader.result.split(",")[1]); };
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+      var prompt = "Look at this receipt. Extract: 1) store or merchant name, 2) purchase date in YYYY-MM-DD format, 3) best category from this list: " + catList + ". Reply ONLY with a JSON object like {\"store\":\"...\",\"date\":\"...\",\"category\":\"...\"}. Use empty string for anything you cannot find.";
+      var result = await askClaude(prompt, base64, file.type);
+      try {
+        var clean = result.replace(/```json/g, "").replace(/```/g, "").trim();
+        return JSON.parse(clean);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function suggestCategory(store, catList) {
+      if (!store.trim()) return "";
+      var prompt = "Given the store or merchant name '" + store + "', pick the single best matching category from this list: " + catList + ". Reply with ONLY the category name, nothing else.";
+      return await askClaude(prompt, null, null);
+    }
+
     // ── Camera Modal ──────────────────────────────────────────────
-    function CameraModal({ onCapture, onClose }) {
-      const videoRef = useRef(null);
-      const canvasRef = useRef(null);
-      const streamRef = useRef(null);
-      const [camReady, setCamReady] = useState(false);
-      const [camErr, setCamErr] = useState("");
-      const [captured, setCaptured] = useState(null);
+    function CameraModal(props) {
+      var onCapture = props.onCapture;
+      var onClose = props.onClose;
+      var videoRef = useRef(null);
+      var canvasRef = useRef(null);
+      var streamRef = useRef(null);
+      var camReadyState = useState(false);
+      var camReady = camReadyState[0]; var setCamReady = camReadyState[1];
+      var camErrState = useState("");
+      var camErr = camErrState[0]; var setCamErr = camErrState[1];
+      var capturedState = useState(null);
+      var captured = capturedState[0]; var setCaptured = capturedState[1];
 
       useEffect(function() {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
@@ -250,10 +313,9 @@
       }, []);
 
       function snap() {
-        var v = videoRef.current, c = canvasRef.current;
+        var v = videoRef.current; var c = canvasRef.current;
         if (!v || !c) return;
-        c.width = v.videoWidth;
-        c.height = v.videoHeight;
+        c.width = v.videoWidth; c.height = v.videoHeight;
         c.getContext("2d").drawImage(v, 0, 0);
         setCaptured(c.toDataURL("image/jpeg", 0.92));
       }
@@ -262,8 +324,7 @@
         if (!captured) return;
         var arr = captured.split(",");
         var mime = arr[0].match(/:(.*?);/)[1];
-        var bstr = atob(arr[1]);
-        var n = bstr.length;
+        var bstr = atob(arr[1]); var n = bstr.length;
         var u8 = new Uint8Array(n);
         while (n--) u8[n] = bstr.charCodeAt(n);
         var file = new File([u8], "camera-" + Date.now() + ".jpg", { type: mime });
@@ -272,36 +333,36 @@
       }
 
       return (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ width: "100%", maxWidth: 480, background: "#111", borderRadius: 10, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
-            <div style={{ background: "#1A3028", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontFamily: "'Playfair Display', serif", color: "#F2EDE4", fontSize: 15 }}>Take Photo</span>
-              <button onClick={onClose} style={{ background: "none", border: "none", color: "#F2EDE4", fontSize: 20, cursor: "pointer", opacity: 0.7, lineHeight: 1 }}>✕</button>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{width:"100%",maxWidth:480,background:"#111",borderRadius:10,overflow:"hidden",boxShadow:"0 32px 80px rgba(0,0,0,0.6)"}}>
+            <div style={{background:"#1A3028",padding:"12px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontFamily:"'Playfair Display',serif",color:"#F2EDE4",fontSize:15}}>Take Photo</span>
+              <button onClick={onClose} style={{background:"none",border:"none",color:"#F2EDE4",fontSize:20,cursor:"pointer",opacity:0.7,lineHeight:1}}>&#x2715;</button>
             </div>
-            <div style={{ position: "relative", background: "#000", minHeight: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{position:"relative",background:"#000",minHeight:280,display:"flex",alignItems:"center",justifyContent:"center"}}>
               {camErr ? (
-                <div style={{ color: "#EEA", fontFamily: "'DM Mono', monospace", fontSize: 12, padding: 32, textAlign: "center" }}>{camErr}</div>
+                <div style={{color:"#EEA",fontFamily:"'DM Mono',monospace",fontSize:12,padding:32,textAlign:"center"}}>{camErr}</div>
               ) : (
                 <React.Fragment>
-                  <video ref={videoRef} style={{ width: "100%", display: captured ? "none" : "block", maxHeight: 360, objectFit: "cover" }} playsInline muted />
-                  {captured && <img src={captured} style={{ width: "100%", maxHeight: 360, objectFit: "contain" }} alt="captured" />}
-                  <canvas ref={canvasRef} style={{ display: "none" }} />
+                  <video ref={videoRef} style={{width:"100%",display:captured?"none":"block",maxHeight:360,objectFit:"cover"}} playsInline muted />
+                  {captured && <img src={captured} style={{width:"100%",maxHeight:360,objectFit:"contain"}} alt="captured" />}
+                  <canvas ref={canvasRef} style={{display:"none"}} />
                   {!camReady && !captured && (
-                    <div style={{ position: "absolute", color: "#666", fontFamily: "'DM Mono', monospace", fontSize: 11 }}>Starting camera…</div>
+                    <div style={{position:"absolute",color:"#666",fontFamily:"'DM Mono',monospace",fontSize:11}}>Starting camera&#8230;</div>
                   )}
                 </React.Fragment>
               )}
             </div>
-            <div style={{ padding: "14px 16px", display: "flex", gap: 10, background: "#1A1A1A" }}>
+            <div style={{padding:"14px 16px",display:"flex",gap:10,background:"#1A1A1A"}}>
               {!captured ? (
                 <React.Fragment>
-                  <button onClick={onClose} style={{ flex: 1, padding: 10, background: "transparent", border: "1px solid #444", borderRadius: 5, color: "#AAA", fontFamily: "'DM Mono', monospace", fontSize: 11, textTransform: "uppercase", cursor: "pointer" }}>Cancel</button>
-                  <button onClick={snap} disabled={!camReady || !!camErr} style={{ flex: 2, padding: 10, background: camReady && !camErr ? "#3A7A52" : "#333", border: "none", borderRadius: 5, color: "#F2EDE4", fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 500, textTransform: "uppercase", cursor: camReady && !camErr ? "pointer" : "not-allowed" }}>📷 Snap</button>
+                  <button onClick={onClose} style={{flex:1,padding:10,background:"transparent",border:"1px solid #444",borderRadius:5,color:"#AAA",fontFamily:"'DM Mono',monospace",fontSize:11,textTransform:"uppercase",cursor:"pointer"}}>Cancel</button>
+                  <button onClick={snap} disabled={!camReady||!!camErr} style={{flex:2,padding:10,background:camReady&&!camErr?"#3A7A52":"#333",border:"none",borderRadius:5,color:"#F2EDE4",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:500,textTransform:"uppercase",cursor:camReady&&!camErr?"pointer":"not-allowed"}}>&#128247; Snap</button>
                 </React.Fragment>
               ) : (
                 <React.Fragment>
-                  <button onClick={function() { setCaptured(null); }} style={{ flex: 1, padding: 10, background: "transparent", border: "1px solid #444", borderRadius: 5, color: "#AAA", fontFamily: "'DM Mono', monospace", fontSize: 11, textTransform: "uppercase", cursor: "pointer" }}>Retake</button>
-                  <button onClick={confirmPhoto} style={{ flex: 2, padding: 10, background: "#3A7A52", border: "none", borderRadius: 5, color: "#F2EDE4", fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 500, textTransform: "uppercase", cursor: "pointer" }}>✓ Use Photo</button>
+                  <button onClick={function(){setCaptured(null);}} style={{flex:1,padding:10,background:"transparent",border:"1px solid #444",borderRadius:5,color:"#AAA",fontFamily:"'DM Mono',monospace",fontSize:11,textTransform:"uppercase",cursor:"pointer"}}>Retake</button>
+                  <button onClick={confirmPhoto} style={{flex:2,padding:10,background:"#3A7A52",border:"none",borderRadius:5,color:"#F2EDE4",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:500,textTransform:"uppercase",cursor:"pointer"}}>&#10003; Use Photo</button>
                 </React.Fragment>
               )}
             </div>
@@ -312,25 +373,27 @@
 
     // ── Main App ──────────────────────────────────────────────────
     function ReceiptTracker() {
-      const [receipts, setReceipts] = useState([]);
-      const [ready, setReady] = useState(false);
-      const [filterAcc, setFilterAcc] = useState("All");
-      const [filterMonth, setFilterMonth] = useState("All");
-      const [showModal, setShowModal] = useState(false);
-      const [showCamera, setShowCamera] = useState(false);
-      const [printing, setPrinting] = useState(false);
-      const [preview, setPreview] = useState(null);
-      const [loadingPreview, setLoadingPreview] = useState(null);
-      const [customCats, setCustomCats] = useState({ personal: [], work: [] });
-      const [formFile, setFormFile] = useState(null);
-      const [formAcc, setFormAcc] = useState("");
-      const [formStore, setFormStore] = useState("");
-      const [formDate, setFormDate] = useState("");
-      const [formCategory, setFormCategory] = useState("");
-      const [formErr, setFormErr] = useState("");
-      const [saving, setSaving] = useState(false);
-      const [newCatInput, setNewCatInput] = useState("");
-      const [addingCat, setAddingCat] = useState(false);
+      var receiptsState = useState([]); var receipts = receiptsState[0]; var setReceipts = receiptsState[1];
+      var readyState = useState(false); var ready = readyState[0]; var setReady = readyState[1];
+      var filterAccState = useState("All"); var filterAcc = filterAccState[0]; var setFilterAcc = filterAccState[1];
+      var filterMonthState = useState("All"); var filterMonth = filterMonthState[0]; var setFilterMonth = filterMonthState[1];
+      var showModalState = useState(false); var showModal = showModalState[0]; var setShowModal = showModalState[1];
+      var showCameraState = useState(false); var showCamera = showCameraState[0]; var setShowCamera = showCameraState[1];
+      var printingState = useState(false); var printing = printingState[0]; var setPrinting = printingState[1];
+      var previewState = useState(null); var preview = previewState[0]; var setPreview = previewState[1];
+      var loadingPreviewState = useState(null); var loadingPreview = loadingPreviewState[0]; var setLoadingPreview = loadingPreviewState[1];
+      var customCatsState = useState({personal:[],work:[]}); var customCats = customCatsState[0]; var setCustomCats = customCatsState[1];
+      var formFileState = useState(null); var formFile = formFileState[0]; var setFormFile = formFileState[1];
+      var formAccState = useState(""); var formAcc = formAccState[0]; var setFormAcc = formAccState[1];
+      var formStoreState = useState(""); var formStore = formStoreState[0]; var setFormStore = formStoreState[1];
+      var formDateState = useState(""); var formDate = formDateState[0]; var setFormDate = formDateState[1];
+      var formCategoryState = useState(""); var formCategory = formCategoryState[0]; var setFormCategory = formCategoryState[1];
+      var formErrState = useState(""); var formErr = formErrState[0]; var setFormErr = formErrState[1];
+      var savingState = useState(false); var saving = savingState[0]; var setSaving = savingState[1];
+      var newCatInputState = useState(""); var newCatInput = newCatInputState[0]; var setNewCatInput = newCatInputState[1];
+      var addingCatState = useState(false); var addingCat = addingCatState[0]; var setAddingCat = addingCatState[1];
+      var scanningState = useState(false); var scanning = scanningState[0]; var setScanning = scanningState[1];
+      var suggestingState = useState(false); var suggesting = suggestingState[0]; var setSuggesting = suggestingState[1];
 
       useEffect(function() {
         setReceipts(loadMeta());
@@ -338,15 +401,15 @@
         setReady(true);
       }, []);
 
-      const catType = formAcc && isWorkAccount(formAcc) ? "work" : "personal";
-      const baseCats = catType === "work" ? DEFAULT_WORK_CATS : DEFAULT_PERSONAL_CATS;
-      const allCats = baseCats.concat(customCats[catType] || []);
+      var catType = formAcc && isWorkAccount(formAcc) ? "work" : "personal";
+      var baseCats = catType === "work" ? DEFAULT_WORK_CATS : DEFAULT_PERSONAL_CATS;
+      var allCats = baseCats.concat(customCats[catType] || []);
 
       function handleAddCategory() {
         var name = newCatInput.trim();
-        if (!name || allCats.includes(name)) { setNewCatInput(""); setAddingCat(false); return; }
-        var updated = Object.assign({}, customCats);
-        updated[catType] = (customCats[catType] || []).concat([name]);
+        if (!name || allCats.indexOf(name) !== -1) { setNewCatInput(""); setAddingCat(false); return; }
+        var updated = { personal: customCats.personal.slice(), work: customCats.work.slice() };
+        updated[catType].push(name);
         setCustomCats(updated);
         saveCustomCats(updated);
         setFormCategory(name);
@@ -354,19 +417,24 @@
         setAddingCat(false);
       }
 
-      const months = Array.from(new Set(receipts.map(function(r) { return r.month; }))).sort().reverse();
-      const filtered = receipts.filter(function(r) {
+      var months = [];
+      var seenMonths = {};
+      receipts.forEach(function(r) { if (!seenMonths[r.month]) { seenMonths[r.month] = true; months.push(r.month); } });
+      months.sort().reverse();
+
+      var filtered = receipts.filter(function(r) {
         return (filterAcc === "All" || r.account === filterAcc) &&
                (filterMonth === "All" || r.month === filterMonth);
       });
-      const grouped = filtered.reduce(function(acc, r) {
-        if (!acc[r.month]) acc[r.month] = [];
-        acc[r.month].push(r);
-        return acc;
-      }, {});
-      const sortedMonths = Object.keys(grouped).sort().reverse();
 
-      function handleFilePick(file) {
+      var grouped = {};
+      filtered.forEach(function(r) {
+        if (!grouped[r.month]) grouped[r.month] = [];
+        grouped[r.month].push(r);
+      });
+      var sortedMonths = Object.keys(grouped).sort().reverse();
+
+      async function handleFilePick(file) {
         if (!file) return;
         if (file.size > MAX_FILE_SIZE) {
           setFormErr("File too large (" + (file.size / 1048576).toFixed(1) + " MB). Max 4.5 MB.");
@@ -378,6 +446,16 @@
         if (p.account) setFormAcc(p.account);
         if (p.store) setFormStore(p.store);
         if (p.date) setFormDate(p.date);
+        if (file.type && file.type.indexOf("image/") === 0) {
+          setScanning(true);
+          var scanned = await scanReceipt(file, allCats.join(", "));
+          setScanning(false);
+          if (scanned) {
+            if (scanned.store && !p.store) setFormStore(scanned.store);
+            if (scanned.date && !p.date) setFormDate(scanned.date);
+            if (scanned.category && allCats.indexOf(scanned.category) !== -1) setFormCategory(scanned.category);
+          }
+        }
       }
 
       async function handleSave() {
@@ -387,27 +465,22 @@
         }
         setSaving(true);
         try {
-          const dataUrl = await new Promise(function(res, rej) {
+          var dataUrl = await new Promise(function(res, rej) {
             var reader = new FileReader();
             reader.onload = function() { res(reader.result); };
             reader.onerror = rej;
             reader.readAsDataURL(formFile);
           });
-          const id = genId();
-          const ext = formFile.name.split(".").pop().toLowerCase();
-          const receipt = {
-            id: id,
-            account: formAcc,
-            store: formStore,
-            date: formDate,
-            month: formDate.slice(0, 7),
-            category: formCategory || "",
+          var id = genId();
+          var ext = formFile.name.split(".").pop().toLowerCase();
+          var receipt = {
+            id: id, account: formAcc, store: formStore, date: formDate,
+            month: formDate.slice(0, 7), category: formCategory || "",
             filename: formAcc + " " + formStore + " " + formDate + "." + ext,
-            type: formFile.type,
-            ext: ext
+            type: formFile.type, ext: ext
           };
           await saveData(id, dataUrl);
-          const updated = receipts.concat([receipt]).sort(function(a, b) { return b.date.localeCompare(a.date); });
+          var updated = receipts.concat([receipt]).sort(function(a, b) { return b.date.localeCompare(a.date); });
           saveMeta(updated);
           setReceipts(updated);
           setShowModal(false);
@@ -419,15 +492,14 @@
       }
 
       function resetForm() {
-        setFormFile(null); setFormAcc(""); setFormStore("");
-        setFormDate(""); setFormCategory(""); setFormErr("");
-        setNewCatInput(""); setAddingCat(false);
+        setFormFile(null); setFormAcc(""); setFormStore(""); setFormDate("");
+        setFormCategory(""); setFormErr(""); setNewCatInput(""); setAddingCat(false);
       }
 
       async function handleDelete(r) {
         if (!confirm("Delete receipt for " + r.store + "?")) return;
         await deleteData(r.id);
-        const updated = receipts.filter(function(x) { return x.id !== r.id; });
+        var updated = receipts.filter(function(x) { return x.id !== r.id; });
         saveMeta(updated);
         setReceipts(updated);
         if (preview && preview.receipt.id === r.id) setPreview(null);
@@ -436,16 +508,25 @@
       async function handlePreview(r) {
         if (preview && preview.receipt.id === r.id) { setPreview(null); return; }
         setLoadingPreview(r.id);
-        const data = await loadData(r.id);
+        var data = await loadData(r.id);
         setPreview({ receipt: r, data: data });
         setLoadingPreview(null);
+      }
+
+      async function handleSuggestCategory() {
+        setSuggesting(true);
+        var cat = await suggestCategory(formStore, allCats.join(", "));
+        if (cat && allCats.indexOf(cat) !== -1) setFormCategory(cat);
+        setSuggesting(false);
       }
 
       async function handlePrint() {
         if (!filtered.length) return;
         setPrinting(true);
-        const withData = await Promise.all(filtered.map(async function(r) {
-          return Object.assign({}, r, { data: await loadData(r.id) });
+        var withData = await Promise.all(filtered.map(async function(r) {
+          var d = await loadData(r.id);
+          return { id:r.id, account:r.account, store:r.store, date:r.date, month:r.month,
+                   category:r.category, filename:r.filename, type:r.type, ext:r.ext, data:d };
         }));
         setPrinting(false);
         var win = window.open("", "_blank");
@@ -453,15 +534,15 @@
         var label = [
           filterAcc !== "All" ? filterAcc : "",
           filterMonth !== "All" ? monthLabel(filterMonth) : ""
-        ].filter(Boolean).join(" — ") || "All Receipts";
+        ].filter(function(x){return x;}).join(" \u2014 ") || "All Receipts";
         var pages = withData.map(function(r) {
-          var isImg = r.type && r.type.startsWith("image/");
+          var isImg = r.type && r.type.indexOf("image/") === 0;
           var content = isImg
             ? '<img src="' + r.data + '" style="max-width:100%;max-height:calc(100vh - 80px);object-fit:contain;">'
             : '<embed src="' + r.data + '" type="application/pdf" width="100%" style="height:calc(100vh - 80px);">';
           return '<div class="page"><p class="lbl">' + r.filename + '</p>' + content + '</div>';
         }).join("");
-        win.document.write('<!DOCTYPE html><html><head><title>' + label + '</title><style>*{margin:0;box-sizing:border-box}body{font-family:Georgia,serif;background:#fff}h1{text-align:center;padding:18px;font-size:15px;border-bottom:1px solid #ddd;color:#222}.page{page-break-after:always;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}.lbl{font-family:monospace;font-size:11px;color:#888;margin-bottom:10px;align-self:flex-start}</style></head><body><h1>' + label + ' \xB7 ' + withData.length + ' receipt' + (withData.length !== 1 ? 's' : '') + '</h1>' + pages + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},700);};<\/scr' + 'ipt></body></html>');
+        win.document.write('<!DOCTYPE html><html><head><title>' + label + '</title><style>*{margin:0;box-sizing:border-box}body{font-family:Georgia,serif;background:#fff}h1{text-align:center;padding:18px;font-size:15px;border-bottom:1px solid #ddd;color:#222}.page{page-break-after:always;padding:20px;display:flex;flex-direction:column;align-items:center;min-height:100vh}.lbl{font-family:monospace;font-size:11px;color:#888;margin-bottom:10px;align-self:flex-start}</style></head><body><h1>' + label + ' \xB7 ' + withData.length + ' receipt' + (withData.length !== 1 ? 's' : '') + '</h1>' + pages + '<scr'+'ipt>window.onload=function(){setTimeout(function(){window.print();},700);};<\/scr'+'ipt></body></html>');
         win.document.close();
       }
 
@@ -475,33 +556,36 @@
 
       function closeModal() { setShowModal(false); resetForm(); }
 
-      const uniqueAccounts = Array.from(new Set(receipts.map(function(r) { return r.account; })));
+      var uniqueAccounts = [];
+      var seenAccounts = {};
+      receipts.forEach(function(r) { if (!seenAccounts[r.account]) { seenAccounts[r.account] = true; uniqueAccounts.push(r.account); } });
 
       return (
         <React.Fragment>
           <div className="rt-root">
+
             <header className="rt-header">
               <div className="rt-header-left">
                 <div className="rt-header-title">Receipt Tracker</div>
                 <div className="rt-header-sub">
-                  {receipts.length} receipt{receipts.length !== 1 ? "s" : ""} · {uniqueAccounts.length} account{uniqueAccounts.length !== 1 ? "s" : ""}
+                  {receipts.length} receipt{receipts.length !== 1 ? "s" : ""} &middot; {uniqueAccounts.length} account{uniqueAccounts.length !== 1 ? "s" : ""}
                 </div>
               </div>
-              <button className="rt-header-upload" onClick={function() { setShowModal(true); }}>+ Upload</button>
+              <button className="rt-header-upload" onClick={function(){setShowModal(true);}}>+ Upload</button>
             </header>
 
             <div className="rt-filters">
               {["All"].concat(ACCOUNTS).map(function(a) {
-                return <button key={a} className={"rt-filter-tab" + (filterAcc === a ? " active" : "")} onClick={function() { setFilterAcc(a); }}>{a}</button>;
+                return <button key={a} className={"rt-filter-tab" + (filterAcc === a ? " active" : "")} onClick={function(){setFilterAcc(a);}}>{a}</button>;
               })}
               <div className="rt-divider" />
-              <select className="rt-month-select" value={filterMonth} onChange={function(e) { setFilterMonth(e.target.value); }}>
+              <select className="rt-month-select" value={filterMonth} onChange={function(e){setFilterMonth(e.target.value);}}>
                 <option value="All">All months</option>
                 {months.map(function(m) { return <option key={m} value={m}>{monthLabel(m)}</option>; })}
               </select>
               {filtered.length > 0 && (
                 <button className="rt-print-btn" onClick={handlePrint} disabled={printing}>
-                  {printing ? "Preparing…" : "Print " + filtered.length}
+                  {printing ? "Preparing\u2026" : "Print " + filtered.length}
                 </button>
               )}
             </div>
@@ -509,10 +593,10 @@
             <div className="rt-main">
               <div className="rt-list">
                 {!ready ? (
-                  <div className="rt-loading">Loading records…</div>
+                  <div className="rt-loading">Loading records&#8230;</div>
                 ) : filtered.length === 0 ? (
                   <div className="rt-empty">
-                    <div className="rt-empty-icon">📂</div>
+                    <div className="rt-empty-icon">&#128194;</div>
                     <div className="rt-empty-title">No receipts found</div>
                     <div className="rt-empty-sub">Upload a receipt to get started</div>
                   </div>
@@ -529,19 +613,19 @@
                         var c = ACCT[r.account] || { bg: "#EEE", text: "#333", border: "#CCC" };
                         var isWork = isWorkAccount(r.account);
                         return (
-                          <div key={r.id} className={"rt-row" + (isActive ? " active" : "")} onClick={function() { handlePreview(r); }}>
-                            <div className="rt-row-icon">{isLoading ? "⏳" : r.type && r.type.startsWith("image/") ? "🖼" : "📄"}</div>
+                          <div key={r.id} className={"rt-row" + (isActive ? " active" : "")} onClick={function(){handlePreview(r);}}>
+                            <div className="rt-row-icon">{isLoading ? "&#9203;" : r.type && r.type.indexOf("image/") === 0 ? "&#128444;" : "&#128196;"}</div>
                             <div className="rt-row-body">
                               <div className="rt-row-name">{r.filename}</div>
                               <div className="rt-row-meta">
-                                <span className="rt-acct-pill" style={{ background: c.bg, color: c.text, border: "1px solid " + c.border }}>{r.account}</span>
+                                <span className="rt-acct-pill" style={{background:c.bg,color:c.text,border:"1px solid "+c.border}}>{r.account}</span>
                                 {isWork && <span className="rt-work-badge">Work</span>}
                                 <span className="rt-row-store">{r.store}</span>
                                 {r.category && <span className="rt-cat-pill">{r.category}</span>}
                               </div>
                             </div>
                             <span className="rt-row-date">{r.date}</span>
-                            <button className="rt-row-del" onClick={function(e) { e.stopPropagation(); handleDelete(r); }} title="Delete">✕</button>
+                            <button className="rt-row-del" onClick={function(e){e.stopPropagation();handleDelete(r);}} title="Delete">&#x2715;</button>
                           </div>
                         );
                       })}
@@ -555,14 +639,14 @@
                   <div className="rt-preview-card">
                     <div className="rt-preview-head">
                       <div className="rt-preview-fname">{preview.receipt.filename}</div>
-                      <button className="rt-preview-close" onClick={function() { setPreview(null); }}>✕</button>
+                      <button className="rt-preview-close" onClick={function(){setPreview(null);}}>&#x2715;</button>
                     </div>
                     <div className="rt-preview-body">
                       {preview.data
-                        ? preview.receipt.type && preview.receipt.type.startsWith("image/")
-                          ? <img src={preview.data} style={{ maxWidth: "100%", maxHeight: 420, objectFit: "contain", borderRadius: 4 }} alt={preview.receipt.filename} />
-                          : <embed src={preview.data} type="application/pdf" width="100%" style={{ height: 420, borderRadius: 4 }} />
-                        : <div style={{ color: "#9A8E82", fontFamily: "'DM Mono', monospace", fontSize: 11 }}>Unable to load preview.</div>
+                        ? preview.receipt.type && preview.receipt.type.indexOf("image/") === 0
+                          ? <img src={preview.data} style={{maxWidth:"100%",maxHeight:420,objectFit:"contain",borderRadius:4}} alt={preview.receipt.filename} />
+                          : <embed src={preview.data} type="application/pdf" width="100%" style={{height:420,borderRadius:4}} />
+                        : <div style={{color:"#9A8E82",fontFamily:"'DM Mono',monospace",fontSize:11}}>Unable to load preview.</div>
                       }
                     </div>
                   </div>
@@ -573,42 +657,50 @@
 
           {showCamera && (
             <CameraModal
-              onCapture={function(file) { handleFilePick(file); setShowCamera(false); setShowModal(true); }}
-              onClose={function() { setShowCamera(false); setShowModal(true); }}
+              onCapture={function(file){handleFilePick(file);setShowCamera(false);setShowModal(true);}}
+              onClose={function(){setShowCamera(false);setShowModal(true);}}
             />
           )}
 
           {showModal && (
-            <div className="rt-overlay" onClick={function(e) { if (e.target === e.currentTarget) closeModal(); }}>
+            <div className="rt-overlay" onClick={function(e){if(e.target===e.currentTarget)closeModal();}}>
               <div className="rt-modal">
                 <div className="rt-modal-head">
                   <div className="rt-modal-title">Upload Receipt</div>
-                  <button className="rt-modal-x" onClick={closeModal}>✕</button>
+                  <button className="rt-modal-x" onClick={closeModal}>&#x2715;</button>
                 </div>
                 <div className="rt-modal-body">
 
                   {formFile ? (
                     <div className="rt-selected-file">
-                      <div className="rt-selected-icon">{formFile.type && formFile.type.startsWith("image/") ? "🖼" : "📄"}</div>
+                      <div className="rt-selected-icon">{formFile.type && formFile.type.indexOf("image/") === 0 ? "&#128444;" : "&#128196;"}</div>
                       <div className="rt-selected-name">{formFile.name}</div>
-                      <div className="rt-selected-sub">
-                        {(formFile.size / 1024).toFixed(0)} KB ·{" "}
-                        <label style={{ color: "#3A7A52", cursor: "pointer", textDecoration: "underline", position: "relative" }}>
-                          change file
-                          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={function(e) { handleFilePick(e.target.files[0]); }} style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", cursor: "pointer" }} />
-                        </label>
-                      </div>
+                      {scanning ? (
+                        <div className="rt-selected-sub" style={{color:"#3A7A52"}}>&#10024; Scanning receipt&#8230;</div>
+                      ) : (
+                        <div className="rt-selected-sub">
+                          {(formFile.size / 1024).toFixed(0)} KB &middot;{" "}
+                          <label style={{color:"#3A7A52",cursor:"pointer",textDecoration:"underline",position:"relative"}}>
+                            change file
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                              onChange={function(e){handleFilePick(e.target.files[0]);}}
+                              style={{position:"absolute",inset:0,opacity:0,width:"100%",cursor:"pointer"}} />
+                          </label>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="rt-pick-row">
                       <label className="rt-pick-btn">
-                        <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={function(e) { handleFilePick(e.target.files[0]); }} style={{ position: "absolute", inset: 0, opacity: 0, width: "100%", height: "100%", cursor: "pointer" }} />
-                        <div className="rt-pick-icon">📎</div>
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                          onChange={function(e){handleFilePick(e.target.files[0]);}}
+                          style={{position:"absolute",inset:0,opacity:0,width:"100%",height:"100%",cursor:"pointer"}} />
+                        <div className="rt-pick-icon">&#128206;</div>
                         <div className="rt-pick-title">Browse file</div>
-                        <div className="rt-pick-sub">PDF · JPG · PNG</div>
+                        <div className="rt-pick-sub">PDF &middot; JPG &middot; PNG</div>
                       </label>
-                      <div className="rt-pick-btn" onClick={function() { setShowModal(false); setShowCamera(true); }}>
-                        <div className="rt-pick-icon">📷</div>
+                      <div className="rt-pick-btn" onClick={function(){setShowModal(false);setShowCamera(true);}}>
+                        <div className="rt-pick-icon">&#128247;</div>
                         <div className="rt-pick-title">Take photo</div>
                         <div className="rt-pick-sub">Use camera</div>
                       </div>
@@ -619,14 +711,13 @@
                     <label className="rt-label">Account</label>
                     <div className="rt-acct-row">
                       {ACCOUNTS.map(function(a) {
-                        var c = ACCT[a];
-                        var active = formAcc === a;
+                        var c = ACCT[a]; var active = formAcc === a;
                         return (
                           <button key={a} className="rt-acct-btn"
-                            onClick={function() { setFormAcc(a); setFormCategory(""); }}
-                            style={active ? { background: c.bg, color: c.text, border: "1.5px solid " + c.dot } : {}}>
+                            onClick={function(){setFormAcc(a);setFormCategory("");}}
+                            style={active ? {background:c.bg,color:c.text,border:"1.5px solid "+c.dot} : {}}>
                             {a}
-                            {isWorkAccount(a) && <span style={{ fontSize: 8, opacity: 0.6, display: "block", marginTop: 1 }}>work</span>}
+                            {isWorkAccount(a) && <span style={{fontSize:8,opacity:0.6,display:"block",marginTop:1}}>work</span>}
                           </button>
                         );
                       })}
@@ -635,16 +726,26 @@
 
                   <div className="rt-field">
                     <label className="rt-label">Store / Merchant</label>
-                    <input className="rt-input" value={formStore} onChange={function(e) { setFormStore(e.target.value); }} placeholder="e.g. Kroger, Amazon, HomeDepot" />
+                    <div style={{display:"flex",gap:8}}>
+                      <input className="rt-input" value={formStore}
+                        onChange={function(e){setFormStore(e.target.value);}}
+                        placeholder="e.g. Kroger, Amazon, HomeDepot"
+                        style={{flex:1}} />
+                      <button className="rt-suggest-btn"
+                        disabled={suggesting || !formStore.trim()}
+                        onClick={handleSuggestCategory}>
+                        {suggesting ? "&#8230;" : "&#10024; Suggest"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="rt-field">
                     <label className="rt-label">
                       Category{" "}
-                      <span style={{ opacity: 0.5, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span>
+                      <span style={{opacity:0.5,fontWeight:400,textTransform:"none",letterSpacing:0}}>(optional)</span>
                       {formAcc && (
-                        <span style={{ marginLeft: 8, color: isWorkAccount(formAcc) ? "#A85520" : "#3A7A52", fontSize: 9 }}>
-                          {isWorkAccount(formAcc) ? "● Work" : "● Personal"}
+                        <span style={{marginLeft:8,color:isWorkAccount(formAcc)?"#A85520":"#3A7A52",fontSize:9}}>
+                          {isWorkAccount(formAcc) ? "\u25CF Work" : "\u25CF Personal"}
                         </span>
                       )}
                     </label>
@@ -652,36 +753,34 @@
                       {allCats.map(function(cat) {
                         return (
                           <button key={cat} className={"rt-cat-chip" + (formCategory === cat ? " active" : "")}
-                            onClick={function() { setFormCategory(formCategory === cat ? "" : cat); }}>
+                            onClick={function(){setFormCategory(formCategory === cat ? "" : cat);}}>
                             {cat}
                           </button>
                         );
                       })}
                     </div>
                     {!addingCat ? (
-                      <button className="rt-cat-add-trigger" onClick={function() { setAddingCat(true); }}>+ Add category</button>
+                      <button className="rt-cat-add-trigger" onClick={function(){setAddingCat(true);}}>+ Add category</button>
                     ) : (
                       <div className="rt-cat-add-row">
-                        <input
-                          className="rt-cat-input"
-                          value={newCatInput}
-                          onChange={function(e) { setNewCatInput(e.target.value); }}
-                          onKeyDown={function(e) {
+                        <input className="rt-cat-input" value={newCatInput}
+                          onChange={function(e){setNewCatInput(e.target.value);}}
+                          onKeyDown={function(e){
                             if (e.key === "Enter") handleAddCategory();
                             if (e.key === "Escape") { setAddingCat(false); setNewCatInput(""); }
                           }}
-                          placeholder="New category name…"
-                          autoFocus
-                        />
+                          placeholder="New category name&#8230;"
+                          autoFocus />
                         <button className="rt-cat-save" onClick={handleAddCategory}>Add</button>
-                        <button className="rt-cat-cancel" onClick={function() { setAddingCat(false); setNewCatInput(""); }}>✕</button>
+                        <button className="rt-cat-cancel" onClick={function(){setAddingCat(false);setNewCatInput("");}}>&#x2715;</button>
                       </div>
                     )}
                   </div>
 
                   <div className="rt-field">
                     <label className="rt-label">Date</label>
-                    <input className="rt-input" type="date" value={formDate} onChange={function(e) { setFormDate(e.target.value); }} />
+                    <input className="rt-input" type="date" value={formDate}
+                      onChange={function(e){setFormDate(e.target.value);}} />
                   </div>
 
                   {genFilename() && (
@@ -696,7 +795,7 @@
                   <div className="rt-modal-actions">
                     <button className="rt-cancel-btn" onClick={closeModal}>Cancel</button>
                     <button className="rt-save-btn" onClick={handleSave} disabled={saving}>
-                      {saving ? "Saving…" : "Save Receipt"}
+                      {saving ? "Saving\u2026" : "Save Receipt"}
                     </button>
                   </div>
                 </div>
@@ -707,10 +806,9 @@
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById("root"));
+    var container = document.getElementById("root");
+    var root = ReactDOM.createRoot(container);
     root.render(<ReceiptTracker />);
   </script>
-</body>
-</html>
 </body>
 </html>
